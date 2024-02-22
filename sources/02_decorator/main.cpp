@@ -1,19 +1,31 @@
 /**
  * 1. 装饰模式演示
- * 2. is-a has-a
+ * 2. 创建装饰器时，避免多次创建组件的资源
  */
 
 #define TEST2
 
 #ifdef TEST1
 
+#include <format>
 #include <iostream>
+#include <memory>
 #include <string>
 
 // 咖啡基础组件
 class Coffee
 {
 public:
+    Coffee()
+    {
+        std::cout << "Create a coffee\n";
+    }
+
+    virtual ~Coffee()
+    {
+        std::cout << "Destroy a coffee\n";
+    }
+
     virtual std::string getDescription() const
     {
         return "Coffee";
@@ -29,10 +41,10 @@ public:
 class CoffeeDecorator : public Coffee
 {
 protected:
-    Coffee* coffee;
+    std::unique_ptr<Coffee> coffee { nullptr };
 
 public:
-    CoffeeDecorator(Coffee* c) : coffee(c)
+    CoffeeDecorator(std::unique_ptr<Coffee> c) : coffee(std::move(c))
     {
     }
 
@@ -51,13 +63,13 @@ public:
 class MilkDecorator : public CoffeeDecorator
 {
 public:
-    MilkDecorator(Coffee* c) : CoffeeDecorator(c)
+    MilkDecorator(std::unique_ptr<Coffee> c) : CoffeeDecorator(std::move(c))
     {
     }
 
     std::string getDescription() const override
     {
-        return coffee->getDescription() + ", Milk";
+        return coffee->getDescription() + " + Milk";
     }
 
     double cost() const override
@@ -70,13 +82,13 @@ public:
 class TeaDecorator : public CoffeeDecorator
 {
 public:
-    TeaDecorator(Coffee* c) : CoffeeDecorator(c)
+    TeaDecorator(std::unique_ptr<Coffee> c) : CoffeeDecorator(std::move(c))
     {
     }
 
     std::string getDescription() const override
     {
-        return coffee->getDescription() + ", Tea";
+        return coffee->getDescription() + " + Tea";
     }
 
     double cost() const override
@@ -85,19 +97,21 @@ public:
     }
 };
 
+/**
+ * 基类是 Coffee，是一个最基础的咖啡类
+ * 可以装饰为 MilkCoffee TeaCoffee MilkAndTeaCoffee
+ */
 int main()
 {
-    Coffee* coffee               = new Coffee();
-    Coffee* coffeeWithMilk       = new MilkDecorator(new Coffee());
-    Coffee* coffeeWithTeaAndMilk = new TeaDecorator(new MilkDecorator(new Coffee()));
+    std::unique_ptr<Coffee> coffee     = std::make_unique<Coffee>();
+    std::unique_ptr<Coffee> milk       = std::make_unique<MilkDecorator>(std::make_unique<Coffee>());
+    std::unique_ptr<Coffee> tea        = std::make_unique<TeaDecorator>(std::make_unique<Coffee>());
+    std::unique_ptr<Coffee> milkAndTea = std::make_unique<TeaDecorator>(std::make_unique<MilkDecorator>(std::make_unique<Coffee>()));
 
-    std::cout << "Simple Coffee: " << coffee->getDescription() << ", Cost: $" << coffee->cost() << std::endl;
-    std::cout << "Coffee with Milk: " << coffeeWithMilk->getDescription() << ", Cost: $" << coffeeWithMilk->cost() << std::endl;
-    std::cout << "Coffee with Tea and Milk: " << coffeeWithTeaAndMilk->getDescription() << ", Cost: $" << coffeeWithTeaAndMilk->cost() << std::endl;
-
-    delete coffee;
-    delete coffeeWithMilk;
-    delete coffeeWithTeaAndMilk;
+    std::cout << std::format("Coffee: {:<15}Description: {:<20}Cost: {:<5}\n", "Simple", coffee->getDescription(), coffee->cost());
+    std::cout << std::format("Coffee: {:<15}Description: {:<20}Cost: {:<5}\n", "Milk", milk->getDescription(), milk->cost());
+    std::cout << std::format("Coffee: {:<15}Description: {:<20}Cost: {:<5}\n", "Tea", tea->getDescription(), tea->cost());
+    std::cout << std::format("Coffee: {:<15}Description: {:<20}Cost: {:<5}\n", "Milk and Tea", milkAndTea->getDescription(), milkAndTea->cost());
 
     return 0;
 }
@@ -106,104 +120,130 @@ int main()
 
 #ifdef TEST2
 
+#include <format>
 #include <iostream>
-#include <map>
 #include <memory>
-#include <vector>
+#include <string>
 
-#define Log() std::cout << __LINE__ << "\t" << __FUNCTION__ << std::endl;
-#define LogStr(str) std::cout << __LINE__ << "\t" << str << std::endl;
-
-class Helper
+// 咖啡基础组件(虚基类)
+class Coffee
 {
 public:
-    Helper()
+    Coffee()
     {
-        Log();
+        // 如果在此处创建资源，具体的装饰器每次构造时都会调用Coffee的构造函数，
+        // CoffeeDecorator还需要一个Coffee类型的参数，因此会多次调用Coffee的构造函数
+        // 解决方法：将Coffee定义为虚基类，资源放在SimpleCoffee中创建，这样就不会多次创建资源
+        std::cout << "Create a coffee\n";
     }
 
-    ~Helper()
+    virtual ~Coffee()
     {
-        Log();
+        std::cout << "Destroy a coffee\n";
     }
 
-    Helper(const Helper&)            = default;
-    Helper(Helper&&)                 = default;
-    Helper& operator=(const Helper&) = default;
-    Helper& operator=(Helper&&)      = default;
+    virtual std::string getDescription() const = 0;
+
+    virtual double cost() const = 0;
 };
 
-class Base
+class SimpleCoffee : public Coffee
 {
-protected:
-    std::shared_ptr<Helper> m_helper { nullptr };
-
 public:
-    Base()
+    SimpleCoffee()
     {
-        LogStr("Base");
+        // 可以在此处创建资源，子类无论被装饰多少次，都只创建一次资源，即只调用一次SimpleCoffee的构造函数
+        // TODO
+        std::cout << "Create a SimpleCoffee\n";
     }
 
-    explicit Base(int)
+    ~SimpleCoffee() override
     {
-        LogStr("Base(int)");
-        m_helper = std::make_shared<Helper>();
+        std::cout << "Destroy a SimpleCoffee\n";
     }
 
-    Base(const Base& b)
+    std::string getDescription() const override
     {
-        LogStr("Base(const Base&)");
+        return "Coffee";
     }
 
-    Base(Base&& b) noexcept
+    double cost() const override
     {
-        LogStr("Base(Base&&)");
-    }
-
-    Base& operator=(const Base&)
-    {
-        LogStr("=Base(const Base&)");
-    }
-
-    Base& operator=(Base&&) noexcept
-    {
-        LogStr("=Base(Base&&)");
-    }
-
-    virtual ~Base()
-    {
-        Log();
+        return 1.;
     }
 };
 
-class Derived : public Base
+// 咖啡装饰器基类
+class CoffeeDecorator : public Coffee
 {
+protected:
+    std::unique_ptr<Coffee> coffee { nullptr };
+
 public:
-    /// @brief 使用引用传参，这样构造Derived时，就只需要构造一次Base
-    /// @param b
-    Derived(Base& b) : Base(b), m_base(b)
+    CoffeeDecorator(std::unique_ptr<Coffee> c) : coffee(std::move(c))
     {
-        Log();
     }
 
-protected:
-    Base m_base;
+    std::string getDescription() const override
+    {
+        return coffee->getDescription();
+    }
+
+    double cost() const override
+    {
+        return coffee->cost();
+    }
+};
+
+class MilkDecorator : public CoffeeDecorator
+{
+public:
+    MilkDecorator(std::unique_ptr<Coffee> c) : CoffeeDecorator(std::move(c))
+    {
+    }
+
+    std::string getDescription() const override
+    {
+        return coffee->getDescription() + " + Milk";
+    }
+
+    double cost() const override
+    {
+        return coffee->cost() + 2.;
+    }
+};
+
+class TeaDecorator : public CoffeeDecorator
+{
+public:
+    TeaDecorator(std::unique_ptr<Coffee> c) : CoffeeDecorator(std::move(c))
+    {
+    }
+
+    std::string getDescription() const override
+    {
+        return coffee->getDescription() + " + Tea";
+    }
+
+    double cost() const override
+    {
+        return coffee->cost() + 3.;
+    }
 };
 
 int main()
 {
-    std::map<int, std::shared_ptr<Base>> map;
-    {
-        Base b(1); // 构造Base 构造Helper
-        std::cout << "1-------------\n";
-        auto d = std::make_shared<Derived>(b); // 构造Derived，此处调用Base的拷贝构造(2次)，不调用 Base(int)
-        std::cout << "2-------------\n";
-        auto d2 = d; // 不调用构造、拷贝构造、赋值等，因为是智能指针，只需要增加引用计数
-        std::cout << "3-------------\n";
-        map[0] = d; // 不调用构造、拷贝构造、赋值等，因为是智能指针，只需要增加引用计数
-        std::cout << "4-------------\n";
-    }
-    std::cout << "5-------------\n";
+    std::unique_ptr<Coffee> coffee     = std::make_unique<SimpleCoffee>();
+    std::unique_ptr<Coffee> milk       = std::make_unique<MilkDecorator>(std::make_unique<SimpleCoffee>());
+    std::unique_ptr<Coffee> tea        = std::make_unique<TeaDecorator>(std::make_unique<SimpleCoffee>());
+    std::unique_ptr<Coffee> milkAndTea = std::make_unique<MilkDecorator>(std::make_unique<TeaDecorator>(std::make_unique<SimpleCoffee>()));
+
+    std::cout << std::format("Coffee: {:<15}Description: {:<20}Cost: {:<5}\n", "Simple", coffee->getDescription(), coffee->cost());
+    std::cout << std::format("Coffee: {:<15}Description: {:<20}Cost: {:<5}\n", "Milk", milk->getDescription(), milk->cost());
+    std::cout << std::format("Coffee: {:<15}Description: {:<20}Cost: {:<5}\n", "Tea", tea->getDescription(), tea->cost());
+    std::cout << std::format("Coffee: {:<15}Description: {:<20}Cost: {:<5}\n", "Milk and Tea", milkAndTea->getDescription(), milkAndTea->cost());
+
+    return 0;
 }
 
 #endif // TEST2
