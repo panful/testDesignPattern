@@ -1,10 +1,88 @@
 /**
- * 1.
+ * 1. 简单工厂模式
  * 2. 工厂方法模式
  * 3. 抽象工厂模式
  */
 
-#define TEST3
+#define TEST1
+
+#ifdef TEST1
+
+#include <iostream>
+#include <memory>
+#include <string>
+
+enum class ProductType
+{
+    A = 0,
+    B,
+};
+
+// 抽象产品类
+class Product
+{
+public:
+    virtual void operation()    = 0;
+    virtual ~Product() noexcept = default;
+};
+
+// 具体产品类 A
+class ConcreteProductA : public Product
+{
+public:
+    void operation() override
+    {
+        std::cout << "ConcreteProductA operation." << std::endl;
+    }
+};
+
+// 具体产品类 B
+class ConcreteProductB : public Product
+{
+public:
+    void operation() override
+    {
+        std::cout << "ConcreteProductB operation." << std::endl;
+    }
+};
+
+// 简单工厂类
+class SimpleFactory
+{
+public:
+    // 创建产品的方法，可以是静态函数，也可以不是
+    static std::unique_ptr<Product> createProduct(const ProductType type)
+    {
+        std::unique_ptr<Product> retval {};
+        switch (type)
+        {
+            case ProductType::A:
+                retval = std::make_unique<ConcreteProductA>();
+                break;
+            case ProductType::B:
+                retval = std::make_unique<ConcreteProductB>();
+                break;
+            default:
+                break;
+        }
+        return retval;
+    }
+};
+
+int main()
+{
+    // 使用简单工厂创建具体产品对象
+    auto pA = SimpleFactory::createProduct(ProductType::A);
+    auto pB = SimpleFactory::createProduct(ProductType::B);
+
+    // 使用产品对象
+    pA->operation();
+    pB->operation();
+
+    return 0;
+}
+
+#endif // TEST1
 
 #ifdef TEST2
 
