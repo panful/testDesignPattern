@@ -86,6 +86,7 @@ MVC模式中，控制器就是中介者
 # 二、软件架构
 ## 01_ecs
 [ECS架构开发思路整理](https://www.jianshu.com/p/5f6cd0866d86)
+[一文看懂ECS架构](https://zhuanlan.zhihu.com/p/618971664)
 
 实体（Entity）：仅仅是一个标识
 组件（Component）：仅有数据
